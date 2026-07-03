@@ -13,7 +13,7 @@ export default defineConfig(({ mode }) => {
   const offline = mode === 'offline';
 
   return {
-    base: offline ? './' : '/spanish-flashcards/',
+    base: offline ? './' : '/vietnamese-flashcards/',
     build: offline ? { outDir: 'dist-offline' } : {},
     plugins: [
       vue(),
