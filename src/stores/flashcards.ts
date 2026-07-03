@@ -129,28 +129,38 @@ const rollEntry = (loc: CardLocation): HistoryEntry => {
   return { ...loc, phraseOrder, phrasePos: 0, showQuestionFirst };
 };
 
-const LS_KEY = 'flashcards.enabledSections';
+// We persist the *disabled* sections, not the enabled ones, so that content
+// added in a later deploy is enabled by default: a section absent from storage
+// (because it didn't exist when the user last saved) is treated as on, not off.
+const LS_KEY = 'flashcards.disabledSections';
 
 const loadEnabledSections = (): string[] => {
+  const all = allSectionKeys();
   try {
     const raw = localStorage.getItem(LS_KEY);
-    if (raw === null) return allSectionKeys();
+    if (raw === null) return all;
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return allSectionKeys();
-    const valid = new Set(allSectionKeys());
-    return parsed.filter((k): k is string => typeof k === 'string' && valid.has(k));
+    if (!Array.isArray(parsed)) return all;
+    // Only sections the user explicitly turned off (and that still exist) are
+    // filtered out; everything else — including brand-new sections — stays on.
+    const disabled = new Set(parsed.filter((k): k is string => typeof k === 'string'));
+    return all.filter(k => !disabled.has(k));
   } catch (error) {
-    logger.warn('failed to load enabled sections from localStorage; falling back to all sections', error);
-    return allSectionKeys();
+    logger.warn('failed to load disabled sections from localStorage; falling back to all sections', error);
+    return all;
   }
 };
 
 const saveEnabledSections = (keys: string[]): void => {
   try {
-    localStorage.setItem(LS_KEY, JSON.stringify(keys));
+    // Store the complement — the sections that are off — against the current
+    // catalog, so stale keys for deleted sections don't accumulate.
+    const enabled = new Set(keys);
+    const disabled = allSectionKeys().filter(k => !enabled.has(k));
+    localStorage.setItem(LS_KEY, JSON.stringify(disabled));
   } catch (error) {
     // localStorage unavailable (private mode, quota, etc.) — non-fatal
-    logger.warn('failed to persist enabled sections to localStorage', error);
+    logger.warn('failed to persist disabled sections to localStorage', error);
   }
 };
 
